@@ -6,13 +6,12 @@ public class InputSystem : MonoBehaviour {
     public Vector2 Movement { get; private set; }
     public Vector2 Look { get; private set; }
     public bool Jump { get; private set; }
-    public bool Crouch;
-    public bool Prone ;
+    public bool Crouch { get; private set; }
+    public bool Prone { get; private set; }
     private bool _cursorLocked;
 
     private void Awake() {
         Instance = this;
-        DontDestroyOnLoad(this);
     }
 
     void Start() {

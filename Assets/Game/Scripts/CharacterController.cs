@@ -12,9 +12,12 @@ public class CharacterController : MonoBehaviour {
     public float maxSlope = 55;
     public Vector3 gravity;
     public Vector3 velocity;
-    public bool IsGrounded = true;
+    public bool isGrounded = true;
     
     private InputSystem _inputSystem;
+    private Transform _cameraPivot;
+    private Transform _cameraAnchor; // avatar view point anchor (head bone)
+    private bool _isVR;
     private float _groundedTime;
     private const float GroundedDist = 0.05f;
     private const float SkinWidth = 0.015f;
@@ -22,17 +25,29 @@ public class CharacterController : MonoBehaviour {
 
     private void Awake() {
         Instance = this;
-        DontDestroyOnLoad(this);
     }
 
     private void Start() {
         _inputSystem = InputSystem.Instance;
+        _cameraPivot = transform.Find("DesktopRig").GetChild(0);
+        _isVR = (bool)GameStateManager.Instance["VRMode"];
+        GameStateManager.Subscribe("VRMode", (_, vrMode) => { _isVR = (bool)vrMode; });
     }
 
-    private void Update() {
+    private void FixedUpdate() {
+        transform.Rotate(-gravity, _inputSystem.Look.x * 100 * Time.deltaTime, Space.World);
+        if (!_isVR) _cameraPivot.transform.parent.Rotate(Vector3.right, -_inputSystem.Look.y * 100 * Time.deltaTime, Space.Self);
+        else _cameraPivot.rotation = _cameraAnchor.rotation;
+        
+        if (_cameraAnchor) {
+            _cameraPivot.position = _cameraAnchor.position;
+            if (!_isVR) _cameraAnchor.rotation = _cameraPivot.rotation;
+        }
+        
         Vector3 movement = new(_inputSystem.Movement.x, 0, _inputSystem.Movement.y);
         if (_inputSystem.Jump && _groundedTime > 0.1f) {
-            IsGrounded = false;
+            isGrounded = false;
+            _groundedTime = 0;
             velocity += -gravity.normalized * Mathf.Sqrt(5 * gravity.magnitude * jumpHeight);
         }
 
@@ -40,12 +55,12 @@ public class CharacterController : MonoBehaviour {
         float value = 1 - Mathf.Clamp01(new Vector3(velocity.x, 0, velocity.z).magnitude / speed);
         movement = Vector3.Lerp(Vector3.ProjectOnPlane(movement, new Vector3(velocity.x, 0, velocity.z)), movement, value); //dont accelerate faster while not grounded
 
-        if (!IsGrounded) movement *= 0.1f; //reduce controllability in air
+        if (!isGrounded) movement *= 0.1f; //reduce controllability in air
 
         Vector3 moveAmount = velocity * Time.deltaTime;
         moveAmount += movement * Time.deltaTime;
 
-        if (IsGrounded) moveAmount *= 1 - (friction * Time.deltaTime); //friction
+        if (isGrounded) moveAmount *= 1 - (friction * Time.deltaTime); //friction
         moveAmount += -moveAmount.normalized * (drag * moveAmount.magnitude * moveAmount.magnitude * Time.deltaTime); //drag
 
         if (moveAmount.magnitude > 0.0000000001) { //move player
@@ -57,9 +72,9 @@ public class CharacterController : MonoBehaviour {
         velocity = moveAmount / Time.deltaTime;
 
         Vector3 point = -gravity.normalized * radius + transform.position;
-        IsGrounded = Physics.SphereCast(point, radius - SkinWidth, gravity, out _, GroundedDist); //grounded check
+        isGrounded = Physics.SphereCast(point, radius - SkinWidth, gravity, out _, GroundedDist); //grounded check
         
-        if (IsGrounded) _groundedTime += Time.deltaTime;
+        if (isGrounded) _groundedTime += Time.deltaTime;
         else _groundedTime = 0;
     }
 
@@ -80,7 +95,7 @@ public class CharacterController : MonoBehaviour {
                 leftover = Vector3.ProjectOnPlane(leftover, hit.normal);
             }
             else { //steep slope
-                if (IsGrounded && !gravityPass) //treat as vertical wall if grounded
+                if (isGrounded && !gravityPass) //treat as vertical wall if grounded
                     leftover = Vector3.ProjectOnPlane(new Vector3(leftover.x, 0, leftover.z), new Vector3(hit.normal.x, 0, hit.normal.z));
                 else leftover = Vector3.ProjectOnPlane(leftover, hit.normal);
             }
