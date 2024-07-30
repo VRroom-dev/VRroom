@@ -34,17 +34,20 @@ public class CharacterController : MonoBehaviour {
         GameStateManager.Subscribe("VRMode", (_, vrMode) => { _isVR = (bool)vrMode; });
     }
 
-    private void FixedUpdate() {
+    private void Update()
+    {
         transform.Rotate(-gravity, _inputSystem.Look.x * 100 * Time.deltaTime, Space.World);
-        if (!_isVR) _cameraPivot.transform.parent.Rotate(Vector3.right, -_inputSystem.Look.y * 100 * Time.deltaTime, Space.Self);
+        if (!_isVR) _cameraPivot.transform.Rotate(Vector3.right, -_inputSystem.Look.y * 100 * Time.deltaTime, Space.Self);
         else _cameraPivot.rotation = _cameraAnchor.rotation;
         
         if (_cameraAnchor) {
             _cameraPivot.position = _cameraAnchor.position;
             if (!_isVR) _cameraAnchor.rotation = _cameraPivot.rotation;
         }
-        
-        Vector3 movement = new(_inputSystem.Movement.x, 0, _inputSystem.Movement.y);
+    }
+    
+    private void FixedUpdate() {
+        Vector3 movement = transform.rotation * new Vector3(_inputSystem.Movement.x, 0, _inputSystem.Movement.y);        
         if (_inputSystem.Jump && _groundedTime > 0.1f) {
             isGrounded = false;
             _groundedTime = 0;
