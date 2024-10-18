@@ -1,162 +1,191 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
-using System.Threading.Tasks;
+using JetBrains.Annotations;
 using UnityEngine;
 
+[PublicAPI]
 public static class NetworkMessenger {
-	private static readonly UdpClient Client = new();
-	private static readonly Dictionary<IPEndPoint, Dictionary<int, Message>> AwaitingMessages = new();
-	private static readonly Dictionary<IPEndPoint, Dictionary<byte, int>> ReceivedMessages = new();
-	public static readonly Queue<Message> Messages = new();
+	private static readonly Socket UDPSocket;
+	private static readonly ConcurrentDictionary<EndPoint, Peer> Peers = new();
+	private static readonly ConcurrentQueue<byte[]> ReceivedQueue = new();
+	private static readonly byte[] Buffer = new byte[65507];
+	private const byte Version = 0; // 2 bit number, only 0, 1, 2, 3 are valid
+	public static float PeerTimeout = 60;
 
 	static NetworkMessenger() {
-		_ = new Timer(HandleRetries, null, 1000, 1000);
-		_ = ReceiveMessages();
+		UDPSocket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+		UDPSocket.Bind(new IPEndPoint(IPAddress.Any, 12345));
+		new Thread(Receive).Start();
 	}
-
-	public static void SendMessage(Message message) {
-		byte[] bytes = message.ToBytes();
-		Client.Send(bytes, bytes.Length, message.EndPoint);
-		
-		if (message.SendFlag < SendFlag.Reliable) return;
-		if (!AwaitingMessages.ContainsKey(message.EndPoint)) {
-			AwaitingMessages[message.EndPoint] = new Dictionary<int, Message>();
-		}
-		AwaitingMessages[message.EndPoint][message.SendTime] = message;
-	}
-
-	private static async Task ReceiveMessages() {
-        while (true) {
-	        try {
-		        UdpReceiveResult result = await Client.ReceiveAsync();
-		        Message message = Message.FromBytes(result.Buffer, result.RemoteEndPoint);
-
-		        if (message.SendFlag == SendFlag.Ok) {
-			        if (AwaitingMessages.TryGetValue(message.EndPoint, out Dictionary<int, Message> awaitingMessage)) {
-				        awaitingMessage.Remove(message.SendTime);
-			        }
-			        continue;
-		        }
-		        
-		        if (message.SendFlag >= SendFlag.Reliable) {
-			        byte[] ok = new byte[9];
-			        ok[0] = (byte)SendFlag.Ok;
-			        Array.Copy(result.Buffer, 1, ok, 1, 8);
-			        Client.Send(ok, ok.Length, result.RemoteEndPoint);
-		        }
-		        
-		        if (message.SendFlag is SendFlag.UnreliableSequenced or SendFlag.ReliableSequenced) {
-			        if (!ReceivedMessages.TryGetValue(message.EndPoint, out Dictionary<byte, int> channelSequences)) {
-				        channelSequences = new Dictionary<byte, int>();
-				        ReceivedMessages[message.EndPoint] = channelSequences;
-			        }
-
-			        if (channelSequences.TryGetValue(message.Channel, out int lastSequence)) {
-				        if (message.SendTime <= lastSequence) {
-					        continue; // Drop out of order or duplicate message
-				        }
-			        }
-
-			        channelSequences[message.Channel] = message.SendTime;
-		        }
-		        
-		        Messages.Enqueue(message);
-	        }
-	        catch (Exception e) {
-		        Debug.LogError(e);
-	        }
-        }
-    }
-
-    private static void HandleRetries(object _) {
-	    foreach (IPEndPoint endpoint in AwaitingMessages.Keys) {
-		    Message[] messages = AwaitingMessages[endpoint].Values.ToArray();
-		    foreach (Message m in messages) {
-			    Message message = m;
-
-			    if (message.Retries != 0) { // wait atleast 1 second before retrying
-				    byte[] bytes = message.ToBytes();
-				    Client.Send(bytes, bytes.Length, message.EndPoint);
-			    } else if (message.Retries > 5) {
-				    AwaitingMessages[endpoint].Remove(message.SendTime);
-			    }
-
-			    message.Retries++;
-		    }
-
-		    if (AwaitingMessages[endpoint].Count == 0) {
-			    AwaitingMessages.Remove(endpoint);
-		    }
-	    }
-	    
-	    int cutoff = (int)DateTime.UtcNow.AddSeconds(-30).Ticks;
-	    foreach (KeyValuePair<IPEndPoint, Dictionary<byte, int>> kvp in ReceivedMessages) {
-		    foreach (KeyValuePair<byte, int> k in kvp.Value.Where(x => x.Value < cutoff)) {
-			    kvp.Value.Remove(k.Key);
-		    }
-
-		    if (kvp.Value.Count == 0) {
-			    ReceivedMessages.Remove(kvp.Key);
-		    }
-	    }
-    }
-}
-
-public struct Message {
-	public IPEndPoint EndPoint;
-	public SendFlag SendFlag;
-	public byte[] Data;
-	public int Retries;
-	public int SendTime;
-	public byte Channel;
-
-	public Message(byte[] bytes, IPEndPoint endPoint, byte channel, SendFlag sendFlag = SendFlag.Unreliable) {
-		Data = new byte[bytes.Length + 17];
-		EndPoint = endPoint;
-		SendFlag = sendFlag;
-		Data = bytes;
-		Retries = 0;
-		Channel = channel;
-		SendTime = (int)DateTime.UtcNow.Ticks;
-	}
-
-	internal byte[] ToBytes() {
-		byte[] bytes = new byte[Data.Length + 6];
-		bytes[0] = (byte)SendFlag;
-		bytes[1] = Channel;
-		bytes[5] = (byte)SendTime;
-		bytes[6] = (byte)(SendTime >> 8);
-		bytes[7] = (byte)(SendTime >> 16);
-		bytes[8] = (byte)(SendTime >> 24);
-		Array.Copy(Data, 0, bytes, 9, Data.Length);
-		return bytes;
-	}
-
-	internal static Message FromBytes(byte[] bytes, IPEndPoint endPoint) {
-		SendFlag sendFlag = (SendFlag)bytes[0];
-		byte channel = bytes[1];
-		int sendTime = bytes[2] | (bytes[3] << 8) | (bytes[4] << 16) | (bytes[5] << 24);
-		byte[] data = bytes[6..];
-
-		return new Message {
-			EndPoint = endPoint,
-			SendFlag = sendFlag,
-			Data = data,
-			Retries = 0,
-			Channel = channel,
-			SendTime = sendTime
-		};
-	}
-}
 	
-public enum SendFlag : byte {
-	Unreliable,
-	UnreliableSequenced,
-	Reliable,
-	ReliableSequenced,
-	Ok,
+	public static void Update() {
+		foreach (Peer peer in Peers.Values) peer.Update();
+	}
+
+	public static bool TryDequeue(out byte[] msg) => ReceivedQueue.TryDequeue(out msg);
+
+	public static void Send(byte[] data, byte messageType, byte channel, EndPoint endPoint) {
+		byte[] msg = new byte[data.Length + 3];
+		msg[0] = (byte)(Version | (messageType << 2));
+		msg[1] = channel;
+		msg[2] = Peers.GetOrAdd(endPoint, ep => new Peer(ep)).GetNextSequenceNumber(channel);
+		System.Buffer.BlockCopy(data, 0, msg, 3, data.Length);
+		Send(msg, endPoint);
+	}
+
+	private static void Send(byte[] msg, EndPoint endPoint) {
+		UDPSocket.SendTo(msg, endPoint);
+		Peers[endPoint].UpdateLastActive();
+	}
+
+	private static void Receive() {
+		EndPoint remoteEp = new IPEndPoint(IPAddress.Any, 0);
+		while (true) {
+			try {
+				int bytes = UDPSocket.ReceiveFrom(Buffer, ref remoteEp);
+				if ((Buffer[0] & 3) != Version) continue;
+				if (bytes < 3) continue;
+
+				int messageType = (Buffer[0] >> 2) & 7;
+				bool isAck = ((Buffer[0] >> 5) & 1) == 1;
+				byte channel = Buffer[1];
+				byte sequence = Buffer[2];
+
+				Peer peer = Peers.GetOrAdd(remoteEp, ep => new Peer(ep));
+				peer.UpdateLastActive();
+
+				if (isAck) {
+					peer.HandleAck(channel, sequence);
+				} else if (bytes > 3) {
+					byte[] data = new byte[bytes - 3];
+					System.Buffer.BlockCopy(Buffer, 3, data, 0, bytes - 3);
+					switch (messageType) {
+						case 0:
+							ReceivedQueue.Enqueue(data);
+							break;
+						case 1:
+							peer.HandleUnreliableSequenced(channel, sequence, data);
+							break;
+						case 2:
+							peer.HandleReliable(channel, sequence, data);
+							break;
+						case 3:
+							peer.HandleReliableSequenced(channel, sequence, data);
+							break;
+						case 4:
+							peer.HandleReliableOrdered(channel, sequence, data);
+							break;
+					}
+				}
+			} catch (Exception e) {
+				Debug.LogError(e);
+			}
+		}
+	}
+	
+	private class Peer {
+		private readonly EndPoint _endPoint;
+		private readonly Dictionary<byte, byte> _outgoingSequenceNumbers = new();
+		private readonly Dictionary<byte, byte> _incomingSequenceNumbers = new();
+		private readonly Dictionary<byte, SortedDictionary<byte, byte[]>> _orderedMessages = new();
+		private readonly ConcurrentDictionary<(byte, byte), (byte[], DateTime, byte)> _unAckedMessages = new();
+		private DateTime _lastActive;
+
+		public Peer(EndPoint endPoint) {
+			_endPoint = endPoint;
+			_lastActive = DateTime.UtcNow;
+		}
+		
+		public void Update() {
+			DateTime now = DateTime.UtcNow;
+			foreach (var kvp in _unAckedMessages) {
+				if ((now - kvp.Value.Item2).TotalSeconds < 1) continue;
+				if (kvp.Value.Item3 > 5) _unAckedMessages.Remove(kvp.Key, out _);
+				
+				Send(kvp.Value.Item1, _endPoint);
+				_unAckedMessages[kvp.Key] = (kvp.Value.Item1, now, (byte)(kvp.Value.Item3 + 1));
+			}
+
+			if ((now - _lastActive).TotalSeconds > PeerTimeout) Peers.TryRemove(_endPoint, out _);
+		}
+
+		public void UpdateLastActive() => _lastActive = DateTime.UtcNow;
+
+		public void HandleAck(byte channel, byte sequence) {
+			_unAckedMessages.Remove((channel, sequence), out _);
+		}
+
+		public void HandleUnreliableSequenced(byte channel, byte sequence, byte[] data) {
+			if (IsNewerSequenceNumber(channel, sequence)) {
+				_incomingSequenceNumbers[channel] = sequence;
+				ReceivedQueue.Enqueue(data);
+			}
+		}
+
+		public void HandleReliable(byte channel, byte sequence, byte[] data) {
+			SendAck(channel, sequence);
+			ReceivedQueue.Enqueue(data);
+		}
+
+		public void HandleReliableSequenced(byte channel, byte sequence, byte[] data) {
+			SendAck(channel, sequence);
+			if (IsNewerSequenceNumber(channel, sequence)) {
+				_incomingSequenceNumbers[channel] = sequence;
+				ReceivedQueue.Enqueue(data);
+			}
+		}
+
+		public void HandleReliableOrdered(byte channel, byte sequence, byte[] data) {
+			SendAck(channel, sequence);
+			if (!_orderedMessages.TryGetValue(channel, out var channelMessages)) {
+				channelMessages = new SortedDictionary<byte, byte[]>();
+				_orderedMessages[channel] = channelMessages;
+			}
+
+			channelMessages[sequence] = data;
+
+			while (channelMessages.Count > 0) {
+				byte firstSeqNum = channelMessages.Keys.Min();
+				if (!IsNextSequenceNumber(channel, firstSeqNum)) break;
+				_incomingSequenceNumbers[channel] = firstSeqNum;
+				ReceivedQueue.Enqueue(channelMessages[firstSeqNum]);
+				channelMessages.Remove(firstSeqNum);
+			}
+		}
+		
+		public byte GetNextSequenceNumber(byte channel) {
+			if (!_outgoingSequenceNumbers.TryGetValue(channel, out byte seqNum)) {
+				seqNum = 0;
+			}
+			_outgoingSequenceNumbers[channel] = (byte)((seqNum + 1) % 256);
+			return seqNum;
+		}
+		
+		private void SendAck(byte channel, byte sequence) {
+			byte[] msg = new byte[3];
+			msg[0] = Version | 40;
+			msg[1] = channel;
+			msg[2] = sequence;
+			Send(msg, _endPoint);
+		}
+
+		private bool IsNewerSequenceNumber(byte channel, byte seqNum) {
+			if (!_incomingSequenceNumbers.TryGetValue(channel, out byte lastSeqNum)) {
+				return true;
+			}
+			return (byte)((seqNum - lastSeqNum + 256) % 256) < 128;
+		}
+
+		private bool IsNextSequenceNumber(byte channel, byte seqNum) {
+			if (!_incomingSequenceNumbers.TryGetValue(channel, out byte lastSeqNum)) {
+				return true;
+			}
+			return seqNum == (byte)((lastSeqNum + 1) % 256);
+		}
+	}
 }

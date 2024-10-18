@@ -1,111 +1,119 @@
 using UnityEngine;
 
-public class CharacterController : MonoBehaviour {
-    public static CharacterController Instance;
-    public float height = 1.6f;
-    public float radius = 0.2f;
-    public float acceleration = 0.5f;
-    public float speed = 10;
-    public float jumpHeight = 1;
-    public float drag = 5;
-    public float friction = 10;
-    public float maxSlope = 55;
-    public Vector3 gravity;
-    public Vector3 velocity;
-    public bool isGrounded = true;
-    
-    private InputSystem _inputSystem;
-    private Transform _cameraPivot;
-    private Transform _cameraAnchor; // avatar view point anchor (head bone)
-    private bool _isVR;
-    private float _groundedTime;
-    private const float GroundedDist = 0.05f;
-    private const float SkinWidth = 0.015f;
-    private const int MaxBounces = 5;
+[RequireComponent(typeof(Rigidbody), typeof(CapsuleCollider))]
+public class CustomCharacterController : MonoBehaviour {
+	public float acceleration = 10f;
+	public float maxSpeed = 10f;
+	public float maxSlope = 55f;
+	public float jumpHeight = 1f;
+	public float uprightSpeed = 5f;
+	public float lookSpeed = 2;
+	public float groundedDistance = 0.01f;
+	public LayerMask groundMask;
+	
+	public Vector3 Gravity {
+		get => _gravityDir * _gravityMag;
+		set {
+			_gravityMag = value.magnitude;
+			_gravityDir = value.normalized;
+		}
+	}
 
-    private void Awake() {
-        Instance = this;
-    }
+	private Transform _camera;
+	private Transform _cameraPivot;
+	private CapsuleCollider _collider;
+	private Rigidbody _rigidbody;
+	private Vector3 _movement;
+	private Vector3 _velocity;
+	private float _pitch;
+	private bool _wasGrounded;
+	private bool _grounded;
+	private bool _isVR;
+	
+	private Vector3 _gravityDir = Vector3.down;
+	private float _gravityMag = 9.81f;
 
-    private void Start() {
-        _inputSystem = InputSystem.Instance;
-        _cameraPivot = transform.Find("DesktopRig").GetChild(0);
-        _isVR = (bool)GameStateManager.Instance["VRMode"];
-        GameStateManager.Subscribe("VRMode", (_, vrMode) => { _isVR = (bool)vrMode; });
-    }
+	private void Awake() {
+		_collider = GetComponent<CapsuleCollider>();
+		_rigidbody = GetComponent<Rigidbody>();
+		_camera = Camera.main!.transform;
+		_cameraPivot = transform.Find("DesktopRig").GetChild(0);
+		GameStateManager.Subscribe("VRMode", (_, vrMode) => {
+			_isVR = (bool)vrMode;
+			_camera = Camera.main.transform;
+		});
+	}
 
-    private void Update()
-    {
-        transform.Rotate(-gravity, _inputSystem.Look.x * 100 * Time.deltaTime, Space.World);
-        if (!_isVR) _cameraPivot.transform.Rotate(Vector3.right, -_inputSystem.Look.y * 100 * Time.deltaTime, Space.Self);
-        else _cameraPivot.rotation = _cameraAnchor.rotation;
-        
-        if (_cameraAnchor) {
-            _cameraPivot.position = _cameraAnchor.position;
-            if (!_isVR) _cameraAnchor.rotation = _cameraPivot.rotation;
-        }
-    }
-    
-    private void FixedUpdate() {
-        Vector3 movement = transform.rotation * new Vector3(_inputSystem.Movement.x, 0, _inputSystem.Movement.y);        
-        if (_inputSystem.Jump && _groundedTime > 0.1f) {
-            isGrounded = false;
-            _groundedTime = 0;
-            velocity += -gravity.normalized * Mathf.Sqrt(5 * gravity.magnitude * jumpHeight);
-        }
+	private void Update() {
+		Vector2 rotation = 100f * lookSpeed * Time.deltaTime * InputSystem.Look;
+		
+		if (_isVR) {
+			Vector3 camForward = _camera.forward;
+			Vector3 forward = Vector3.ProjectOnPlane(camForward, _gravityDir).normalized;
+			transform.forward = forward;
+			_camera.forward = camForward;
+			transform.position = _camera.position;
+			_camera.position = transform.position;
+		} else {
+			_pitch -= rotation.y;
+			_pitch = Mathf.Clamp(_pitch, -90, 90);
+			_cameraPivot.localRotation = Quaternion.Euler(_pitch, _cameraPivot.localEulerAngles.y, _cameraPivot.localEulerAngles.z);
+		}
+		
+		transform.Rotate(-_gravityDir, rotation.x, Space.World);
+	}
 
-        movement *= acceleration;
-        float value = 1 - Mathf.Clamp01(new Vector3(velocity.x, 0, velocity.z).magnitude / speed);
-        movement = Vector3.Lerp(Vector3.ProjectOnPlane(movement, new Vector3(velocity.x, 0, velocity.z)), movement, value); //dont accelerate faster while not grounded
+	private void FixedUpdate() {
+		_velocity = _rigidbody.linearVelocity;
+		
+		// gravity
+		if (!_grounded) _velocity += Gravity * Time.fixedDeltaTime;
+		
+		Vector3 verticalVelocity = Vector3.Project(_velocity, _gravityDir);
+		Vector3 horizontalVelocity = Vector3.ProjectOnPlane(_velocity, _gravityDir);
+		
+		// movement
+		Vector2 input = Vector2.ClampMagnitude(InputSystem.Movement, 1f) * maxSpeed;
+		Vector3 movement = (transform.right * input.x + transform.forward * input.y).normalized * maxSpeed;
+		movement = Vector3.ProjectOnPlane(movement, _gravityDir);
+		horizontalVelocity = Vector3.MoveTowards(horizontalVelocity, movement, acceleration * Time.fixedDeltaTime);
+		
+		_velocity = horizontalVelocity + verticalVelocity;
 
-        if (!isGrounded) movement *= 0.1f; //reduce controllability in air
+		// grounding
+		_wasGrounded = _grounded;
+		if (Physics.SphereCast(transform.position + transform.up * (_collider.height - _collider.radius), _collider.radius, _gravityDir, out RaycastHit hit, 1f, groundMask)) {
+			_grounded = hit.distance - (_collider.height - _collider.radius * 2f) <= groundedDistance;
+			
+			if (_grounded) {
+				transform.position += _gravityDir * (hit.distance - (_collider.height - _collider.radius * 2f));
 
-        Vector3 moveAmount = velocity * Time.deltaTime;
-        moveAmount += movement * Time.deltaTime;
+				if (Vector3.Angle(hit.normal, -_gravityDir) <= maxSlope) {
+					_velocity = Vector3.ProjectOnPlane(_velocity, hit.normal);
+				}
+			}
+			else if (_wasGrounded) {
+				if (Vector3.Angle(hit.normal, -_gravityDir) <= maxSlope) {
+					transform.position += _gravityDir * (hit.distance - (_collider.height - _collider.radius * 2f));
+					_velocity = Vector3.ProjectOnPlane(_velocity, hit.normal);
+					_grounded = true;
+				}
+			}
+		} else _grounded = false;
+		
+		// jump
+		if (_grounded && InputSystem.Jump) {
+			_velocity = Vector3.ProjectOnPlane(_velocity, _gravityDir);
+			_velocity -= _gravityDir * Mathf.Sqrt(2f * jumpHeight * _gravityMag);
+			_wasGrounded = false;
+			_grounded = false;
+		}
+		
+		_rigidbody.linearVelocity = _velocity;
 
-        if (isGrounded) moveAmount *= 1 - (friction * Time.deltaTime); //friction
-        moveAmount += -moveAmount.normalized * (drag * moveAmount.magnitude * moveAmount.magnitude * Time.deltaTime); //drag
-
-        if (moveAmount.magnitude > 0.0000000001) { //move player
-            moveAmount = CollideAndSlide(moveAmount, transform.position, false);
-            moveAmount += CollideAndSlide(gravity * (0.01f * Time.deltaTime), transform.position + moveAmount, true);
-            transform.position += moveAmount;
-        }
-
-        velocity = moveAmount / Time.deltaTime;
-
-        Vector3 point = -gravity.normalized * radius + transform.position;
-        isGrounded = Physics.SphereCast(point, radius - SkinWidth, gravity, out _, GroundedDist); //grounded check
-        
-        if (isGrounded) _groundedTime += Time.deltaTime;
-        else _groundedTime = 0;
-    }
-
-    private Vector3 CollideAndSlide(Vector3 vel, Vector3 pos, bool gravityPass, int depth = 0) {
-        if (depth > MaxBounces) return Vector3.zero;
-        float dist = vel.magnitude + SkinWidth;
-        Vector3 point1 = pos + -gravity.normalized * (height - radius);
-        Vector3 point2 = pos + -gravity.normalized * radius;
-
-        if (Physics.CapsuleCast(point1, point2, radius, vel, out RaycastHit hit, dist)) {
-            Vector3 snapToSurface = vel.normalized * (hit.distance - SkinWidth);
-            if (snapToSurface.magnitude <= SkinWidth) snapToSurface = Vector3.zero;
-            Vector3 leftover = vel - snapToSurface;
-            float angle = Vector3.Angle(Vector3.up, hit.normal);
-
-            if (angle <= maxSlope) { //normal ground
-                if (gravityPass) return snapToSurface;
-                leftover = Vector3.ProjectOnPlane(leftover, hit.normal);
-            }
-            else { //steep slope
-                if (isGrounded && !gravityPass) //treat as vertical wall if grounded
-                    leftover = Vector3.ProjectOnPlane(new Vector3(leftover.x, 0, leftover.z), new Vector3(hit.normal.x, 0, hit.normal.z));
-                else leftover = Vector3.ProjectOnPlane(leftover, hit.normal);
-            }
-
-            return snapToSurface + CollideAndSlide(leftover, pos + snapToSurface, gravityPass, depth + 1);
-        }
-
-        return vel;
-    }
+		// gravity alignment
+		Quaternion currentRotation = transform.rotation;
+		Quaternion targetRotation = Quaternion.FromToRotation(transform.up, -_gravityDir) * currentRotation;
+		_rigidbody.MoveRotation(Quaternion.Slerp(currentRotation, targetRotation, uprightSpeed * Time.fixedDeltaTime));
+	}
 }

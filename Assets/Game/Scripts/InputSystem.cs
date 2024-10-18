@@ -1,24 +1,21 @@
+using JetBrains.Annotations;
 using UnityEngine;
 
+[PublicAPI]
 public class InputSystem : MonoBehaviour {
-    public static InputSystem Instance;
-    public float mouseSensitivity = 2;
-    public Vector2 Movement { get; private set; }
-    public Vector2 Look { get; private set; }
-    public bool Jump { get; private set; }
-    public bool Crouch { get; private set; }
-    public bool Prone { get; private set; }
-    private bool _cursorLocked;
+    public static float MouseSensitivity = 2;
+    public static Vector2 Movement { get; private set; }
+    public static Vector2 Look { get; private set; }
+    public static bool Jump { get; private set; }
+    public static bool Crouch { get; private set; }
+    public static bool Prone { get; private set; }
+    private static bool _cursorLocked;
 
-    private void Awake() {
-        Instance = this;
-    }
-
-    void Start() {
+    private void Start() {
         ToggleCursorLock();
     }
 
-    void Update() {
+    private void Update() {
         Movement = new Vector2(Input.GetAxis("Horizontal"), Input.GetAxis("Vertical"));
         if (Input.GetKeyDown(KeyCode.Escape)) ToggleCursorLock();
         Jump = Input.GetKey(KeyCode.Space);
@@ -33,7 +30,7 @@ public class InputSystem : MonoBehaviour {
         }
 
         if (_cursorLocked) {
-            Look = new Vector2(Input.GetAxis("Mouse X"), Input.GetAxis("Mouse Y")) * mouseSensitivity;
+            Look = new Vector2(Input.GetAxis("Mouse X"), Input.GetAxis("Mouse Y")) * MouseSensitivity;
         }
     }
 
