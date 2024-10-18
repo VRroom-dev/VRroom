@@ -1,5 +1,7 @@
 using System.Collections.Generic;
+using JetBrains.Annotations;
 
+[PublicAPI]
 public class GameStateManager {
     public static GameStateManager Instance { get; } = new();
     private static readonly Dictionary<string, object> States = new();
@@ -19,7 +21,9 @@ public class GameStateManager {
     }
     
     public static void Subscribe(string key, StateChangedHandler handler) {
-        StateChangedEvents[key] += handler;
+        if (StateChangedEvents.ContainsKey(key)) {
+            StateChangedEvents[key] += handler;
+        }
     }
     
     public static void Unsubscribe(string key, StateChangedHandler handler) {

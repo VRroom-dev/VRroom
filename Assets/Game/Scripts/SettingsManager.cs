@@ -3,12 +3,14 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.RegularExpressions;
+using JetBrains.Annotations;
 using UnityEngine;
 
+[PublicAPI]
 public class SettingsManager : MonoBehaviour {
     public static event Action<Dictionary<string, object>> LoadDefaultSettings;
+    private readonly Dictionary<string, object> _defaultSettings = new();
     private DateTime _lastModified;
-    private Dictionary<string, object> _defaultSettings = new();
     private const string SettingsPath = "settings.txt";
 
     private void Start() {
