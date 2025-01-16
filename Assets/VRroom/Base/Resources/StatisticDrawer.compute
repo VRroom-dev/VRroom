@@ -1,0 +1,100 @@
+#pragma kernel Draw
+
+struct StatisticData {
+    float4 LineColor;
+    uint Head;
+    uint Count;
+};
+
+RWTexture2D<half4> Output;
+StructuredBuffer<float> Points;
+StructuredBuffer<StatisticData> Data;
+uint Count, BufferSize;
+float Min, Max;
+
+float GetPoint(uint offset, uint position) {
+    position = position % BufferSize;
+    return Points[offset + position];
+}
+
+float distanceToLineSegment(float2 p, float2 a, float2 b) {
+    float2 lineVec = b - a;
+    float2 pointVec = p - a;
+    float t = saturate(dot(pointVec, lineVec) / dot(lineVec, lineVec));
+    float2 closestPoint = a + t * lineVec;
+    return length(p - closestPoint);
+}
+
+float smoothLine(float dist) {
+    return 1.0 - smoothstep(0, 1, abs(dist));
+}
+
+[numthreads(8,8,1)]
+void Draw(uint3 id : SV_DispatchThreadID) {
+    const half4 HorizontalLineColor = half4(0.25, 0.25, 0.25, 1);
+    const half4 VerticalLineColor = half4(0.15, 0.15, 0.15, 1);
+    const half4 BackgroundColor = half4(0.1, 0.1, 0.1, 1);
+    const half4 BorderColor = half4(0.4, 0.4, 0.4, 1);
+
+    
+    uint width, height;
+    Output.GetDimensions(width, height);
+
+    float2 pixel = float2(id.x, height - id.y);
+    float2 uv = float2(pixel) / float2(width, height);
+    
+    half4 output = BackgroundColor;
+
+    [unroll]
+    for (uint i = 0; i <= 6; i++) {
+        float lineY = i / 6.0;
+        float dist = abs(uv.y - lineY) * height;
+        output = lerp(output, HorizontalLineColor, smoothLine(dist));
+    }
+    
+    [unroll]
+    for (uint i = 0; i <= 4; i++) {
+        float lineX = i / 4.0;
+        float dist = abs(uv.x - lineX) * width;
+        output = lerp(output, VerticalLineColor, smoothLine(dist));
+    }
+    
+    uint basePosition = uv.x * BufferSize;
+    basePosition = basePosition > 1 ? basePosition - 2 : 0;
+    
+    for (uint i = 0; i < Count; i++) {
+        uint offset = i * BufferSize;
+        StatisticData data = Data[i];
+        
+        float minDist = 1000000;
+        [unroll]
+        for (uint j = 0; j < 5; j++) {
+            uint pos = basePosition + j;
+            
+            float2 p1 = float2(
+                pos / (float)BufferSize,
+                (GetPoint(offset, data.Head + pos) - Min) / (Max - Min)
+            );
+    
+            if (p1.y == 0 || p1.x >= 1) continue;
+            
+            float2 p2 = float2(
+                (pos + 1) / (float)BufferSize,
+                (GetPoint(offset, data.Head + pos + 1) - Min) / (Max - Min)
+            );
+            
+            if (p2.y == 0 || p2.x >= 1) continue;
+            
+            float2 pixelP1 = p1 * float2(width, height);
+            float2 pixelP2 = p2 * float2(width, height);
+            
+            float dist = distanceToLineSegment(pixel, pixelP1, pixelP2);
+            minDist = min(minDist, dist);
+        }
+        
+        output = lerp(output, data.LineColor, smoothLine(minDist));
+    }
+    
+    float borderDist = min(min(uv.x * width, (1 - uv.x) * width - 1), min(uv.y * height - 1, (1 - uv.y) * height));
+    Output[id.xy] = lerp(output, BorderColor, smoothLine(borderDist));
+}

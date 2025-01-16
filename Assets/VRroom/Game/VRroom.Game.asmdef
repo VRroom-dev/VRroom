@@ -1,0 +1,16 @@
+{
+    "name": "VRroom.Game",
+    "rootNamespace": "VRroom.Game",
+    "references": [
+        "GUID:e7002efb5118a8542be1a1886ce61106"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": true,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
