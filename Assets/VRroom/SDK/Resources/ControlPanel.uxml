@@ -1,0 +1,56 @@
+<engine:UXML xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:engine="UnityEngine.UIElements" xmlns:editor="UnityEditor.UIElements" noNamespaceSchemaLocation="../../../../UIElementsSchema/UIElements.xsd" editor-extension-mode="True">
+    <Style src="project://database/Assets/VRroom/SDK/Resources/ControlPanel.uss?fileID=7433441132597879392&amp;guid=f89eb9f2f0cf00f41bb2eabd03e65b1c&amp;type=3#ControlPanel" />
+    <engine:VisualElement name="Root" style="flex-grow: 1; padding-top: 5px; padding-right: 5px; padding-bottom: 5px; padding-left: 5px; flex-shrink: 0;">
+        <engine:VisualElement name="ContentConfiguration" style="border-top-left-radius: 5px; border-top-right-radius: 5px; border-bottom-right-radius: 5px; border-bottom-left-radius: 5px; overflow: hidden; padding-top: 5px; padding-right: 5px; padding-bottom: 5px; padding-left: 5px; background-color: rgba(128, 128, 128, 0.2); flex-shrink: 0;">
+            <engine:VisualElement name="ContentInfo" style="flex-direction: row; flex-shrink: 0;">
+                <engine:VisualElement name="ThumbnailContainer" style="width: 150px; height: 150px; overflow: hidden; border-top-left-radius: 5px; border-top-right-radius: 5px; border-bottom-right-radius: 5px; border-bottom-left-radius: 5px; border-left-color: rgba(0, 0, 0, 0.5); border-right-color: rgba(0, 0, 0, 0.5); border-top-color: rgba(0, 0, 0, 0.5); border-bottom-color: rgba(0, 0, 0, 0.5); border-top-width: 1px; border-right-width: 1px; border-bottom-width: 1px; border-left-width: 1px; flex-shrink: 0;">
+                    <engine:VisualElement name="Thumbnail" style="flex-grow: 1; border-top-left-radius: 5px; border-top-right-radius: 5px; border-bottom-right-radius: 5px; border-bottom-left-radius: 5px; overflow: hidden;" />
+                    <engine:VisualElement name="ButtonExpander" style="position: absolute; height: 20px; left: 0; bottom: 0; right: 0; background-image: resource(&apos;Menu&apos;); -unity-background-scale-mode: scale-to-fit; -unity-background-image-tint-color: rgba(0, 0, 0, 0.5); background-size: 20px 20px;" />
+                    <engine:VisualElement name="ButtonContainer" style="height: 20px; flex-direction: row; position: absolute; left: 0; bottom: 0; right: 0; background-image: none;">
+                        <engine:VisualElement style="flex-grow: 1;" />
+                        <engine:VisualElement style="flex-grow: 1;" />
+                    </engine:VisualElement>
+                </engine:VisualElement>
+                <engine:VisualElement name="VisualElement" style="flex-grow: 1;">
+                    <engine:TextField label="Name" style="flex-direction: column; margin-right: 0;" />
+                    <engine:TextField label="Description" style="flex-direction: column; flex-grow: 1; margin-right: 0;" />
+                </engine:VisualElement>
+            </engine:VisualElement>
+            <engine:VisualElement name="ContentWarnings" style="margin-top: 5px; flex-direction: row;">
+                <engine:VisualElement name="HelpBox" class="unity-help-box" style="overflow: hidden; flex-direction: row; align-items: center; flex-shrink: 0; flex-grow: 1; margin-left: 0;">
+                    <engine:Toggle name="Toggle">
+                        <engine:Label />
+                    </engine:Toggle>
+                    <engine:VisualElement>
+                        <engine:Label text="Explicit" style="font-size: 16px;" />
+                        <engine:Label text="Features Nudity or sexual content" />
+                    </engine:VisualElement>
+                </engine:VisualElement>
+                <engine:VisualElement name="HelpBox" class="unity-help-box" style="overflow: hidden; flex-direction: row; align-items: center; flex-shrink: 0; flex-grow: 1; margin-right: 0;">
+                    <engine:Toggle name="Toggle">
+                        <engine:Label />
+                    </engine:Toggle>
+                    <engine:VisualElement>
+                        <engine:Label text="Gore" style="font-size: 16px;" />
+                        <engine:Label text="Shows Blood or other disturbing imagery" />
+                    </engine:VisualElement>
+                </engine:VisualElement>
+            </engine:VisualElement>
+            <engine:VisualElement name="Separator" class="Separator" />
+            <engine:VisualElement name="Statistics" style="align-items: center;">
+                <engine:VisualElement name="CenteredContainer" style="max-width: 250px; width: 50%; flex-direction: row;">
+                    <engine:VisualElement name="Left" style="flex-grow: 1; flex-shrink: 0;">
+                        <engine:Label text="Version:" name="VersionLabel" />
+                        <engine:Label text="Last Upload:" name="LastUploadLabel" />
+                    </engine:VisualElement>
+                    <engine:VisualElement name="Right" style="flex-grow: 0; flex-shrink: 0;">
+                        <engine:Label text="999" name="VersionCount" />
+                        <engine:Label text="Jan 17 2025 @ 6:27AM" name="LastUploadDate" />
+                    </engine:VisualElement>
+                </engine:VisualElement>
+            </engine:VisualElement>
+            <engine:VisualElement name="Separator" class="Separator" />
+            <engine:VisualElement name="Validations" />
+        </engine:VisualElement>
+    </engine:VisualElement>
+</engine:UXML>

@@ -103,6 +103,9 @@ namespace VRroom.Base {
 			SceneManager.sceneLoaded += RunLoadingTasks;
 			_coroutineRunner = CoroutineRunner.Instance;
 			await RunTasks(StartupTasks).AsTask();
+			// remove when loading implemented
+			EnableSystems();
+			CameraTransition.Transition(false);
 		}
 	}
 }

@@ -4,8 +4,8 @@ using UnityEngine;
 namespace VRroom.Base {
     [PublicAPI]
     public class InputSystem : MonoBehaviour {
-        public static float MouseSensitivity = 2;
-        public static Vector2 Movement { get; private set; }
+        public static float MouseSensitivity = 4;
+        public static Vector3 Movement { get; private set; }
         public static Vector2 Look { get; private set; }
         public static bool Jump { get; private set; }
         public static bool Crouch { get; private set; }
@@ -18,7 +18,7 @@ namespace VRroom.Base {
         }
 
         private void Update() {
-            Movement = new Vector2(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical"));
+            Movement = new Vector3(Input.GetAxisRaw("Horizontal"), 0, Input.GetAxisRaw("Vertical"));
             if (Input.GetKeyDown(KeyCode.Escape)) SetCursorLock(!_cursorLocked);
             Jump = Input.GetKey(KeyCode.Space);
             Sprint = Input.GetKey(KeyCode.LeftShift);
@@ -33,7 +33,7 @@ namespace VRroom.Base {
             }
 
             if (_cursorLocked) {
-                Look = new Vector2(Input.GetAxis("Mouse X") * 2, Input.GetAxis("Mouse Y")) * MouseSensitivity;
+                Look = new Vector2(Input.GetAxis("Mouse X"), Input.GetAxis("Mouse Y")) * MouseSensitivity;
             }
         }
 
