@@ -990,7 +990,7 @@ MeshRenderer:
   m_IgnoreNormalsForChartDetection: 0
   m_ImportantGI: 0
   m_StitchLightmapSeams: 1
-  m_SelectedEditorRenderState: 2
+  m_SelectedEditorRenderState: 3
   m_MinimumChartSize: 4
   m_AutoUVMaxDistance: 0.5
   m_AutoUVMaxAngle: 89
@@ -9615,12 +9615,12 @@ MonoBehaviour:
   walkSpeed: 4
   runSpeed: 6
   maxSlope: 55
-  maxStepHeight: 0.4
+  maxStepHeight: 0.2
   jumpHeight: 0.6
   uprightSpeed: 5
   skinWidth: 0.01
   groundedDistance: 0.01
-  pushForce: 5
+  pushForce: 1
   ground:
     serializedVersion: 2
     m_Bits: 55
