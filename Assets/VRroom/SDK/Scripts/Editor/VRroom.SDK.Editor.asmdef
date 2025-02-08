@@ -1,7 +1,9 @@
 {
     "name": "VRroom.SDK.Editor",
     "rootNamespace": "VRroom.SDK.Editor",
-    "references": [],
+    "references": [
+        "GUID:e7002efb5118a8542be1a1886ce61106"
+    ],
     "includePlatforms": [
         "Editor"
     ],

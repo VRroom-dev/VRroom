@@ -158,7 +158,6 @@ namespace VRroom.Base {
 		}
 
 		private bool ValidGround(Vector3 normal) => Vector3.Angle(normal, -_gravityDir) < maxSlope;
-		private float GetVerticalOffset(Vector3 point) => Vector3.Project(point - _position, _gravityDir).magnitude;
 
 		private bool CastSelf(Vector3 pos, Vector3 dir, float dist, out RaycastHit hit) {
 			float radius = _radius * _scale - skinWidth;
