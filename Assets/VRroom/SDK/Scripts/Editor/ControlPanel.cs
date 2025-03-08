@@ -70,7 +70,7 @@ namespace VRroom.SDK.Editor {
 			if (string.IsNullOrEmpty(_usernameField.value) || string.IsNullOrEmpty(_passwordField.value)) return;
 			Response response = await SDKAPI.Login(_usernameField.value, _passwordField.value);
 			if (!response.Success) {
-				Debug.LogError($"Failed To Login: {response.Error}");
+				Debug.LogError($"Failed To Login: {response.Result}");
 				return;
 			}
 			

@@ -262,14 +262,16 @@ namespace VRroom.SDK.Editor {
 			descriptor.goreTag = _goreTag.value;
 
 			if (string.IsNullOrEmpty(descriptor.guid)) {
-				Response response = await SDKAPI.CreateContent("world");
-				descriptor.guid = response.Result["contentId"]?.ToString();
+				Response response = await SDKAPI.CreateContent(descriptor.name, descriptor.description, ContentType.World, ContentWarningTags.None);
+				descriptor.guid = response.Result.Replace("\"", "");
 			}
 
 			string bundlePath = AssetBundleBuilder.Build(descriptor);
-			byte[] bundleBytes = await File.ReadAllBytesAsync(bundlePath);
 
-			await SDKAPI.UpdateContent(descriptor.guid, bundleBytes, null, descriptor.name, descriptor.description, null);
+			await SDKAPI.UpdateContent(descriptor.guid, descriptor.name, descriptor.description, ContentWarningTags.None);
+			await SDKAPI.UpdateBundle(descriptor.guid, bundlePath);
+			
+			Debug.Log("Upload Complete.");
 		}
 	}
 }

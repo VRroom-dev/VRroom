@@ -8,7 +8,7 @@
 				ItemType.GameMode => "gam_",
 				ItemType.User => "usr_",
 				ItemType.Instance => "ins_",
-				ItemType.Server => "ser_",
+				ItemType.Server => "srv_",
 			};
 		}
 	}

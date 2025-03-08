@@ -1222,10 +1222,10 @@ Rigidbody:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 155826091}
-  serializedVersion: 4
+  serializedVersion: 5
   m_Mass: 1
-  m_Drag: 0
-  m_AngularDrag: 0.05
+  m_LinearDamping: 0
+  m_AngularDamping: 0.05
   m_CenterOfMass: {x: 0, y: 0, z: 0}
   m_InertiaTensor: {x: 1, y: 1, z: 1}
   m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
@@ -1343,10 +1343,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3f87ad17884e4fbda5d45b523d163df2, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  guid: 
-  name: 
-  description: 
+  guid: 0195632e-9e9b-7945-ab3b-c9546a7f984c
+  name: meow
+  description: aaa
   thumbnailPath: 
+  explicitTag: 0
+  goreTag: 0
 --- !u!1 &220936898
 GameObject:
   m_ObjectHideFlags: 0
@@ -8622,6 +8624,8 @@ MonoBehaviour:
   name: 
   description: 
   thumbnailPath: 
+  explicitTag: 0
+  goreTag: 0
 --- !u!43 &1317691480
 Mesh:
   m_ObjectHideFlags: 0
@@ -9614,10 +9618,10 @@ Rigidbody:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2040011519}
-  serializedVersion: 4
+  serializedVersion: 5
   m_Mass: 1
-  m_Drag: 0
-  m_AngularDrag: 0
+  m_LinearDamping: 0
+  m_AngularDamping: 0
   m_CenterOfMass: {x: 0, y: 0, z: 0}
   m_InertiaTensor: {x: 1, y: 1, z: 1}
   m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}

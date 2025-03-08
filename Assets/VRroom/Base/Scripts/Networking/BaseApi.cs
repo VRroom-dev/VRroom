@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using System.Threading.Tasks;
@@ -14,7 +13,7 @@ using Debug = UnityEngine.Debug;
 namespace VRroom.Base.Networking {
 	[PublicAPI]
 	public abstract class BaseAPI<T> where T : BaseAPI<T> {
-        protected const string BaseUrl = "https://api.koneko.cat";
+        protected const string BaseUrl = "https://api.koneko.cat/v1";
         // ReSharper disable StaticMemberInGenericType
         private static string _authTokenPath;
         private static string _authToken;
@@ -28,30 +27,29 @@ namespace VRroom.Base.Networking {
         }
 
         public static async Task<Response> CreateAccount(string handle, string email, string password) {
-            return await SendRequest(CreateRequest($"{BaseUrl}/account", "POST", new { handle, email, password }));
+            return await SendRequest(CreateRequest($"{BaseUrl}/auth/register", "POST", new { handle, email, password }));
         }
 
-        public static async Task<Response> Login(string username, string password) {
-            object requestData = new { username, password, deviceInfo = SystemInfo.deviceModel };
-            Response response = await SendRequest(CreateRequest($"{BaseUrl}/auth/login", "POST", requestData));
+        public static async Task<Response> Login(string identifier, string password) {
+            Response response = await SendRequest(CreateRequest($"{BaseUrl}/auth/login", "POST", new { identifier, password }));
             if (!response.Success) return response;
-
-            JObject result = response.Result as JObject;
-            _authToken = result?["authToken"]?.ToString();
+            
+            JObject responseJson = JObject.Parse(response.Result);
+            _authToken = responseJson["token"]!.ToString();
             SaveAuthToken();
             return response;
         }
 
         public static async Task<Response> GetUser(string userId) {
-            return await SendRequest(UnityWebRequest.Get($"{BaseUrl}/user/{userId}"));
+            return await SendRequest(UnityWebRequest.Get($"{BaseUrl}/profile/{userId}"));
         }
 
-        public static async Task<Response> GetUsers(List<string> userIds) {
-            return await SendRequest(CreateRequest($"{BaseUrl}/users", "GET", new { userIds }));
-        }
+        //public static async Task<Response> GetUsers(List<string> userIds) {
+        //    return await SendRequest(CreateRequest($"{BaseUrl}/users", "GET", new { userIds }));
+        //}
 
         public static async Task<Response> GetMyContent() {
-            return await SendRequest(UnityWebRequest.Get($"{BaseUrl}/content"));
+            return await SendRequest(UnityWebRequest.Get($"{BaseUrl}/content/mine"));
         }
 
         public static async Task<Response> GetContentInfo(string contentId) {
@@ -60,7 +58,7 @@ namespace VRroom.Base.Networking {
         
         protected static UnityWebRequest CreateRequest(string url, string method, object data) {
             string json = JsonConvert.SerializeObject(data);
-            var request = new UnityWebRequest(url, method) {
+            UnityWebRequest request = new(url, method) {
                 uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(json)),
                 downloadHandler = new DownloadHandlerBuffer()
             };
@@ -70,21 +68,19 @@ namespace VRroom.Base.Networking {
 
         protected static async Task<Response> SendRequest(UnityWebRequest request) {
             if (!string.IsNullOrEmpty(_authToken))
-                request.SetRequestHeader("Authorization", _authToken);
+                request.SetRequestHeader("Authorization", $"Bearer {_authToken}");
 
             try {
                 await request.SendWebRequest();
 
-                string responseText = request.downloadHandler.text;
-                JObject responseJson = JObject.Parse(responseText);
-                
-                return request.result != UnityWebRequest.Result.Success ? 
-                    new Response { Success = false, Error = responseJson["error"]?.ToString() } : 
-                    new Response { Success = true, Result = responseJson };
+                return new Response {
+                    Success = request.result == UnityWebRequest.Result.Success,
+                    Result = request.error ?? request.downloadHandler.text
+                };
             }
             catch (Exception e) {
                 Debug.LogException(e);
-                return new Response { Success = false, Error = e.Message };
+                return new Response { Success = false, Result = e.Message };
             }
         }
         
@@ -113,7 +109,6 @@ namespace VRroom.Base.Networking {
 
     public struct Response {
         public bool Success;
-        public string Error;
-        public JObject Result;
+        public string Result;
     }
 }
